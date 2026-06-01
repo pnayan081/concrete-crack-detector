@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concrete Crack Detection</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #202124;
+      --muted: #626b75;
+      --line: #d9dee5;
+      --soft: #f8fafc;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --blue: #2563eb;
+      --amber: #b7791f;
+      --danger: #b42318;
+      --danger-bg: #fff1f0;
+      --ok: #147d43;
+      --ok-bg: #effaf3;
+      --shadow: 0 18px 45px rgba(28, 35, 45, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .shell {
+      width: min(1280px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 30px 0;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .status-pill {
+      flex: 0 0 auto;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(340px, 0.9fr) minmax(0, 1.25fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .upload-panel,
+    .result-panel {
+      padding: 18px;
+    }
+
+    .dropzone {
+      min-height: 320px;
+      display: grid;
+      place-items: center;
+      border: 2px dashed #b8c3ce;
+      border-radius: 8px;
+      background: var(--soft);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .dropzone.is-dragging {
+      border-color: var(--accent);
+      background: #edf8f6;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 28px;
+      color: var(--muted);
+    }
+
+    .empty-state strong {
+      display: block;
+      color: var(--ink);
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+
+    .preview-image,
+    .result-image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-height: 540px;
+      object-fit: contain;
+      background: #e9edf2;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .file-button,
+    button,
+    .tab-button {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      padding: 0 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .file-button,
+    .tab-button {
+      background: var(--soft);
+      color: var(--ink);
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    button:hover {
+      background: var(--accent-strong);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .filename {
+      color: var(--muted);
+      font-size: 13px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .result-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .result-title {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      padding: 8px 11px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .badge.cracked {
+      color: var(--danger);
+      background: var(--danger-bg);
+      border-color: #ffc9c3;
+    }
+
+    .badge.possible {
+      color: var(--amber);
+      background: #fff8e6;
+      border-color: #f2d48a;
+    }
+
+    .badge.clean {
+      color: var(--ok);
+      background: var(--ok-bg);
+      border-color: #bfe9cc;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .gauge-card,
+    .chart-card,
+    .summary-card,
+    .details-card,
+    .hotspot-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+      padding: 14px;
+    }
+
+    .gauge {
+      width: 140px;
+      height: 140px;
+      margin: 0 auto 10px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--danger) 0deg, var(--danger) 0deg, #e6ebf0 0deg);
+      position: relative;
+    }
+
+    .gauge::after {
+      content: "";
+      width: 98px;
+      height: 98px;
+      border-radius: 50%;
+      background: var(--panel);
+      position: absolute;
+    }
+
+    .gauge-value {
+      position: relative;
+      z-index: 1;
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .section-label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr) 58px;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .bar-track {
+      height: 12px;
+      border-radius: 999px;
+      background: #e6ebf0;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--blue);
+      transition: width 180ms ease;
+    }
+
+    .bar-fill.crack {
+      background: var(--danger);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--soft);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 18px;
+      overflow-wrap: anywhere;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .tab-button {
+      min-height: 34px;
+      font-size: 13px;
+      padding: 0 12px;
+    }
+
+    .tab-button.active {
+      background: #e7f5f3;
+      color: var(--accent-strong);
+      border-color: #91d4cd;
+    }
+
+    .image-frame {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-height: 300px;
+      overflow: hidden;
+      background: #e9edf2;
+      display: grid;
+      place-items: center;
+      margin-bottom: 12px;
+      position: relative;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .legend-ramp {
+      width: 130px;
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #2563eb, #22c55e, #facc15, #dc2626);
+      border: 1px solid var(--line);
+    }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .summary-card strong,
+    .details-card strong,
+    .hotspot-card strong {
+      display: block;
+      font-size: 16px;
+      overflow-wrap: anywhere;
+    }
+
+    .hotspot-list {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .hotspot-pill {
+      border: 1px solid #ffc9c3;
+      background: #fff7f6;
+      color: var(--danger);
+      border-radius: 999px;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--soft);
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 12px 14px;
+      font-weight: 700;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      max-height: 260px;
+      overflow: auto;
+      border-top: 1px solid var(--line);
+      background: #171a1f;
+      color: #edf2f7;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .message {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: var(--soft);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .message.error {
+      color: var(--danger);
+      background: var(--danger-bg);
+      border-color: #ffc9c3;
+    }
+
+    @media (max-width: 980px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .grid,
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+
+      .metrics,
+      .report-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .shell {
+        width: min(100% - 20px, 1280px);
+        padding: 18px 0;
+      }
+
+      .metrics,
+      .report-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .bar-row {
+        grid-template-columns: 76px minmax(0, 1fr) 52px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>Concrete Crack Detection</h1>
+        <p class="subtitle">Upload a concrete image and review classification, crack likelihood, and highlighted evidence areas.</p>
+      </div>
+      <div class="status-pill" id="apiStatus">API ready</div>
+    </header>
+
+    <section class="grid">
+      <div class="panel upload-panel">
+        <div class="dropzone" id="dropzone">
+          <div class="empty-state" id="emptyState">
+            <strong>Select an image</strong>
+            JPG, PNG, JPEG, and BMP files are supported.
+          </div>
+          <img class="preview-image" id="previewImage" alt="Selected concrete preview" hidden>
+        </div>
+
+        <div class="controls">
+          <label class="file-button" for="fileInput">Choose Image</label>
+          <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.bmp,image/jpeg,image/png,image/bmp">
+          <button id="predictButton" type="button" disabled>Check Crack</button>
+          <span class="filename" id="filename">No image selected</span>
+        </div>
+
+        <div class="message" id="message">Upload an image to start.</div>
+      </div>
+
+      <div class="panel result-panel">
+        <div class="result-head">
+          <div>
+            <h2 class="result-title">Inspection Dashboard</h2>
+            <p class="subtitle" id="resultSubtitle">Waiting for an image.</p>
+          </div>
+          <span class="badge" id="resultBadge">No result</span>
+        </div>
+
+        <div class="dashboard">
+          <div class="gauge-card">
+            <span class="section-label">Crack likelihood</span>
+            <div class="gauge" id="probabilityGauge">
+              <span class="gauge-value" id="gaugeValue">--</span>
+            </div>
+            <p class="subtitle" id="riskLevel">Risk level will appear here.</p>
+          </div>
+
+          <div class="chart-card">
+            <span class="section-label">Probability split</span>
+            <div class="bar-row">
+              <span>Cracked</span>
+              <div class="bar-track"><div class="bar-fill crack" id="crackedBar"></div></div>
+              <strong id="crackedValue">--</strong>
+            </div>
+            <div class="bar-row">
+              <span>Non-cracked</span>
+              <div class="bar-track"><div class="bar-fill" id="nonCrackedBar"></div></div>
+              <strong id="nonCrackedValue">--</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="metric">
+            <span>Confidence</span>
+            <strong id="confidence">--</strong>
+          </div>
+          <div class="metric">
+            <span>Threshold</span>
+            <strong id="threshold">--</strong>
+          </div>
+          <div class="metric">
+            <span>Hotspots</span>
+            <strong id="hotspotCount">--</strong>
+          </div>
+          <div class="metric">
+            <span>Affected area</span>
+            <strong id="dominantArea">--</strong>
+          </div>
+        </div>
+
+        <div class="tabs" aria-label="Image view options">
+          <button class="tab-button active" type="button" data-view="original">Original</button>
+          <button class="tab-button" type="button" data-view="heatmap">Heatmap</button>
+          <button class="tab-button" type="button" data-view="overlay">Highlighted Overlay</button>
+        </div>
+
+        <div class="image-frame">
+          <img class="result-image" id="resultImage" alt="Selected analysis view" hidden>
+          <span class="subtitle" id="resultImageEmpty">Analysis image will appear here.</span>
+        </div>
+
+        <div class="legend" id="legend" hidden>
+          <span>Low evidence</span>
+          <span class="legend-ramp"></span>
+          <span>High evidence</span>
+        </div>
+
+        <div class="report-grid">
+          <div class="summary-card">
+            <span class="section-label">Final result</span>
+            <strong id="finalResult">--</strong>
+          </div>
+          <div class="summary-card">
+            <span class="section-label">Image details</span>
+            <strong id="imageDetails">--</strong>
+          </div>
+          <div class="summary-card">
+            <span class="section-label">File details</span>
+            <strong id="fileDetails">--</strong>
+          </div>
+        </div>
+
+        <div class="hotspot-card">
+          <span class="section-label">Likely crack areas</span>
+          <strong id="hotspotSummary">No hotspot data yet.</strong>
+          <div class="hotspot-list" id="hotspotList"></div>
+        </div>
+
+        <details>
+          <summary>Raw API response</summary>
+          <pre id="rawResponse">{}</pre>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const predictButton = document.getElementById("predictButton");
+    const previewImage = document.getElementById("previewImage");
+    const emptyState = document.getElementById("emptyState");
+    const filename = document.getElementById("filename");
+    const message = document.getElementById("message");
+    const apiStatus = document.getElementById("apiStatus");
+    const dropzone = document.getElementById("dropzone");
+    const resultBadge = document.getElementById("resultBadge");
+    const resultSubtitle = document.getElementById("resultSubtitle");
+    const confidence = document.getElementById("confidence");
+    const threshold = document.getElementById("threshold");
+    const resultImage = document.getElementById("resultImage");
+    const resultImageEmpty = document.getElementById("resultImageEmpty");
+    const rawResponse = document.getElementById("rawResponse");
+    const probabilityGauge = document.getElementById("probabilityGauge");
+    const gaugeValue = document.getElementById("gaugeValue");
+    const riskLevel = document.getElementById("riskLevel");
+    const crackedBar = document.getElementById("crackedBar");
+    const nonCrackedBar = document.getElementById("nonCrackedBar");
+    const crackedValue = document.getElementById("crackedValue");
+    const nonCrackedValue = document.getElementById("nonCrackedValue");
+    const hotspotCount = document.getElementById("hotspotCount");
+    const dominantArea = document.getElementById("dominantArea");
+    const finalResult = document.getElementById("finalResult");
+    const imageDetails = document.getElementById("imageDetails");
+    const fileDetails = document.getElementById("fileDetails");
+    const hotspotSummary = document.getElementById("hotspotSummary");
+    const hotspotList = document.getElementById("hotspotList");
+    const legend = document.getElementById("legend");
+    const tabButtons = Array.from(document.querySelectorAll(".tab-button"));
+
+    let selectedFile = null;
+    let latestResult = null;
+    let activeView = "original";
+
+    function setMessage(text, isError = false) {
+      message.textContent = text;
+      message.classList.toggle("error", isError);
+    }
+
+    function formatPercent(value) {
+      if (typeof value !== "number") {
+        return "--";
+      }
+      return `${(value * 100).toFixed(1)}%`;
+    }
+
+    function clampPercent(value) {
+      if (typeof value !== "number") {
+        return 0;
+      }
+      return Math.min(100, Math.max(0, value * 100));
+    }
+
+    function imageSource(image) {
+      if (!image || !image.base64 || !image.mime_type) {
+        return "";
+      }
+      return `data:${image.mime_type};base64,${image.base64}`;
+    }
+
+    function setSelectedFile(file) {
+      selectedFile = file;
+      predictButton.disabled = !file;
+      filename.textContent = file ? file.name : "No image selected";
+
+      if (!file) {
+        previewImage.hidden = true;
+        emptyState.hidden = false;
+        return;
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+      previewImage.onload = () => URL.revokeObjectURL(previewUrl);
+      previewImage.src = previewUrl;
+      previewImage.hidden = false;
+      emptyState.hidden = true;
+      setMessage("Image selected. Run prediction when ready.");
+    }
+
+    function setActiveView(view) {
+      activeView = view;
+      tabButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.view === view);
+      });
+      updateResultImage();
+    }
+
+    function updateResultImage() {
+      if (!latestResult) {
+        return;
+      }
+
+      const explainability = latestResult.explainability || {};
+      const viewMap = {
+        original: latestResult.image,
+        heatmap: explainability.heatmap_image,
+        overlay: explainability.overlay_image
+      };
+      const source = imageSource(viewMap[activeView]);
+
+      if (source) {
+        resultImage.src = source;
+        resultImage.hidden = false;
+        resultImageEmpty.hidden = true;
+        legend.hidden = activeView === "original";
+      } else {
+        resultImage.hidden = true;
+        resultImageEmpty.hidden = false;
+        legend.hidden = true;
+      }
+    }
+
+    function renderHotspots(hotspots) {
+      hotspotList.innerHTML = "";
+      if (!hotspots || hotspots.length === 0) {
+        hotspotSummary.textContent = "No high-evidence crack hotspot found.";
+        return;
+      }
+
+      hotspotSummary.textContent = `${hotspots.length} likely crack region${hotspots.length === 1 ? "" : "s"} highlighted.`;
+      hotspots.forEach((hotspot, index) => {
+        const pill = document.createElement("span");
+        pill.className = "hotspot-pill";
+        pill.textContent = `Area ${index + 1}: ${formatPercent(hotspot.score)}`;
+        hotspotList.appendChild(pill);
+      });
+    }
+
+    function renderResult(data) {
+      latestResult = data;
+      const cracked = Boolean(data.has_crack);
+      const crackProbability = data.crack_probability || 0;
+      const analysis = data.analysis || {};
+      const probabilities = data.probabilities || {};
+      const explainability = data.explainability || {};
+      const nonCrackedProbability = typeof probabilities.non_cracked === "number" ? probabilities.non_cracked : (1 - crackProbability);
+      const risk = analysis.risk_level || data.label || "Unknown";
+      const riskClass = risk === "Possible Crack" ? "possible" : cracked ? "cracked" : "clean";
+
+      resultBadge.textContent = risk;
+      resultBadge.className = `badge ${riskClass}`;
+      resultSubtitle.textContent = cracked
+        ? "Crack evidence was detected. Review the highlighted overlay for model focus areas."
+        : "No crack detected. Heatmap is shown as low-evidence model focus.";
+
+      confidence.textContent = formatPercent(data.confidence);
+      threshold.textContent = typeof data.threshold === "number" ? data.threshold : "--";
+      hotspotCount.textContent = String(typeof analysis.hotspot_count === "number" ? analysis.hotspot_count : 0);
+      dominantArea.textContent = analysis.dominant_area || "none";
+      finalResult.textContent = data.label || "Unknown";
+
+      const degrees = Math.round(clampPercent(crackProbability) * 3.6);
+      probabilityGauge.style.background = `conic-gradient(var(--danger) 0deg, var(--danger) ${degrees}deg, #e6ebf0 ${degrees}deg)`;
+      gaugeValue.textContent = formatPercent(crackProbability);
+      riskLevel.textContent = risk;
+
+      crackedBar.style.width = `${clampPercent(crackProbability)}%`;
+      nonCrackedBar.style.width = `${clampPercent(nonCrackedProbability)}%`;
+      crackedValue.textContent = formatPercent(crackProbability);
+      nonCrackedValue.textContent = formatPercent(nonCrackedProbability);
+
+      const imageInfo = data.image_info || {};
+      imageDetails.textContent = imageInfo.width && imageInfo.height
+        ? `${imageInfo.width} x ${imageInfo.height}px`
+        : "--";
+      const fileSize = typeof imageInfo.file_size_kb === "number" ? imageInfo.file_size_kb : "--";
+      fileDetails.textContent = `${fileSize} KB, ${imageInfo.mime_type || "unknown type"}`;
+
+      renderHotspots(explainability.hotspots || []);
+      setActiveView(explainability.overlay_image ? "overlay" : "original");
+      rawResponse.textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function runPrediction() {
+      if (!selectedFile) {
+        setMessage("Please choose an image first.", true);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      predictButton.disabled = true;
+      apiStatus.textContent = "Checking image";
+      setMessage("Sending image to backend...");
+
+      try {
+        const response = await fetch("/predict", {
+          method: "POST",
+          body: formData
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || "Prediction failed.");
+        }
+
+        renderResult(data);
+        setMessage("Prediction complete. Dashboard updated with probability, report summary, and highlighted evidence view.");
+        apiStatus.textContent = "API ready";
+      } catch (error) {
+        setMessage(error.message || "Could not connect to the backend.", true);
+        apiStatus.textContent = "API error";
+      } finally {
+        predictButton.disabled = false;
+      }
+    }
+
+    fileInput.addEventListener("change", () => {
+      setSelectedFile(fileInput.files[0] || null);
+    });
+
+    predictButton.addEventListener("click", runPrediction);
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => setActiveView(button.dataset.view));
+    });
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.add("is-dragging");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("is-dragging");
+      });
+    });
+
+    dropzone.addEventListener("drop", (event) => {
+      const file = event.dataTransfer.files[0];
+      if (file) {
+        setSelectedFile(file);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "labels": {
+    "0": "Non-Cracked",
+    "1": "Cracked"
+  },
+  "input_size": [
+    64,
+    64
+  ],
+  "channels": 3,
+  "threshold": 0.5,
+  "preprocessing": {
+    "color_mode": "RGB",
+    "resize": [
+      64,
+      64
+    ],
+    "normalization": "pixel_value / 255.0"
+  }
+}

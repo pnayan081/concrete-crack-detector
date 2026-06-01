@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concrete Crack Detection</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f2;
+      --panel: #ffffff;
+      --ink: #202124;
+      --muted: #636a72;
+      --line: #d9ded6;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --danger: #b42318;
+      --danger-bg: #fff1f0;
+      --ok: #147d43;
+      --ok-bg: #effaf3;
+      --shadow: 0 18px 45px rgba(37, 43, 36, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 34px 0;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .status-pill {
+      flex: 0 0 auto;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(340px, 1.05fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .upload-panel {
+      padding: 18px;
+    }
+
+    .dropzone {
+      min-height: 322px;
+      display: grid;
+      place-items: center;
+      border: 2px dashed #b7c4bc;
+      border-radius: 8px;
+      background: #fbfcf8;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .dropzone.is-dragging {
+      border-color: var(--accent);
+      background: #eef8f6;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 28px;
+      color: var(--muted);
+    }
+
+    .empty-state strong {
+      display: block;
+      color: var(--ink);
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+
+    .preview-image,
+    .result-image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-height: 520px;
+      object-fit: contain;
+      background: #eef0ea;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .file-button,
+    button {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      padding: 0 15px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .file-button {
+      background: #f8faf7;
+      color: var(--ink);
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    button:hover {
+      background: var(--accent-strong);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .filename {
+      color: var(--muted);
+      font-size: 13px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .result-panel {
+      padding: 18px;
+    }
+
+    .result-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .result-title {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      padding: 8px 11px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid var(--line);
+      background: #f8faf7;
+      color: var(--muted);
+    }
+
+    .badge.cracked {
+      color: var(--danger);
+      background: var(--danger-bg);
+      border-color: #ffc9c3;
+    }
+
+    .badge.clean {
+      color: var(--ok);
+      background: var(--ok-bg);
+      border-color: #bfe9cc;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcf8;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 20px;
+      overflow-wrap: anywhere;
+    }
+
+    .image-frame {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-height: 260px;
+      overflow: hidden;
+      background: #eef0ea;
+      display: grid;
+      place-items: center;
+      margin-bottom: 16px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      max-height: 230px;
+      overflow: auto;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #171a1f;
+      color: #edf2f7;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .message {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: #fbfcf8;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .message.error {
+      color: var(--danger);
+      background: var(--danger-bg);
+      border-color: #ffc9c3;
+    }
+
+    @media (max-width: 860px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>Concrete Crack Detection</h1>
+        <p class="subtitle">Upload a concrete image and review the backend prediction result.</p>
+      </div>
+      <div class="status-pill" id="apiStatus">API ready</div>
+    </header>
+
+    <section class="grid">
+      <div class="panel upload-panel">
+        <div class="dropzone" id="dropzone">
+          <div class="empty-state" id="emptyState">
+            <strong>Select an image</strong>
+            JPG, PNG, JPEG, and BMP files are supported.
+          </div>
+          <img class="preview-image" id="previewImage" alt="Selected concrete preview" hidden>
+        </div>
+
+        <div class="controls">
+          <label class="file-button" for="fileInput">Choose Image</label>
+          <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.bmp,image/jpeg,image/png,image/bmp">
+          <button id="predictButton" type="button" disabled>Check Crack</button>
+          <span class="filename" id="filename">No image selected</span>
+        </div>
+
+        <div class="message" id="message">Upload an image to start.</div>
+      </div>
+
+      <div class="panel result-panel">
+        <div class="result-head">
+          <div>
+            <h2 class="result-title">Prediction Result</h2>
+            <p class="subtitle" id="resultSubtitle">Waiting for an image.</p>
+          </div>
+          <span class="badge" id="resultBadge">No result</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric">
+            <span>Confidence</span>
+            <strong id="confidence">--</strong>
+          </div>
+          <div class="metric">
+            <span>Crack probability</span>
+            <strong id="probability">--</strong>
+          </div>
+          <div class="metric">
+            <span>Has crack</span>
+            <strong id="hasCrack">--</strong>
+          </div>
+          <div class="metric">
+            <span>Threshold</span>
+            <strong id="threshold">--</strong>
+          </div>
+        </div>
+
+        <div class="image-frame">
+          <img class="result-image" id="resultImage" alt="Backend returned image" hidden>
+          <span class="subtitle" id="resultImageEmpty">Backend image response will appear here.</span>
+        </div>
+
+        <pre id="rawResponse">{}</pre>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const predictButton = document.getElementById("predictButton");
+    const previewImage = document.getElementById("previewImage");
+    const emptyState = document.getElementById("emptyState");
+    const filename = document.getElementById("filename");
+    const message = document.getElementById("message");
+    const apiStatus = document.getElementById("apiStatus");
+    const dropzone = document.getElementById("dropzone");
+    const resultBadge = document.getElementById("resultBadge");
+    const resultSubtitle = document.getElementById("resultSubtitle");
+    const confidence = document.getElementById("confidence");
+    const probability = document.getElementById("probability");
+    const hasCrack = document.getElementById("hasCrack");
+    const threshold = document.getElementById("threshold");
+    const resultImage = document.getElementById("resultImage");
+    const resultImageEmpty = document.getElementById("resultImageEmpty");
+    const rawResponse = document.getElementById("rawResponse");
+
+    let selectedFile = null;
+
+    function setMessage(text, isError = false) {
+      message.textContent = text;
+      message.classList.toggle("error", isError);
+    }
+
+    function formatPercent(value) {
+      if (typeof value !== "number") {
+        return "--";
+      }
+      return `${(value * 100).toFixed(2)}%`;
+    }
+
+    function setSelectedFile(file) {
+      selectedFile = file;
+      predictButton.disabled = !file;
+      filename.textContent = file ? file.name : "No image selected";
+
+      if (!file) {
+        previewImage.hidden = true;
+        emptyState.hidden = false;
+        return;
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+      previewImage.onload = () => URL.revokeObjectURL(previewUrl);
+      previewImage.src = previewUrl;
+      previewImage.hidden = false;
+      emptyState.hidden = true;
+      setMessage("Image selected. Run prediction when ready.");
+    }
+
+    function renderResult(data) {
+      const cracked = Boolean(data.has_crack);
+      resultBadge.textContent = data.label || "Unknown";
+      resultBadge.className = cracked ? "badge cracked" : "badge clean";
+      resultSubtitle.textContent = cracked
+        ? "Crack detected in the uploaded concrete image."
+        : "No crack detected in the uploaded concrete image.";
+
+      confidence.textContent = formatPercent(data.confidence);
+      probability.textContent = formatPercent(data.crack_probability);
+      hasCrack.textContent = String(data.has_crack);
+      threshold.textContent = data.threshold ?? "--";
+
+      if (data.image && data.image.base64 && data.image.mime_type) {
+        resultImage.src = `data:${data.image.mime_type};base64,${data.image.base64}`;
+        resultImage.hidden = false;
+        resultImageEmpty.hidden = true;
+      }
+
+      rawResponse.textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function runPrediction() {
+      if (!selectedFile) {
+        setMessage("Please choose an image first.", true);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      predictButton.disabled = true;
+      apiStatus.textContent = "Checking image";
+      setMessage("Sending image to backend...");
+
+      try {
+        const response = await fetch("/predict", {
+          method: "POST",
+          body: formData
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || "Prediction failed.");
+        }
+
+        renderResult(data);
+        setMessage("Prediction complete.");
+        apiStatus.textContent = "API ready";
+      } catch (error) {
+        setMessage(error.message || "Could not connect to the backend.", true);
+        apiStatus.textContent = "API error";
+      } finally {
+        predictButton.disabled = false;
+      }
+    }
+
+    fileInput.addEventListener("change", () => {
+      setSelectedFile(fileInput.files[0] || null);
+    });
+
+    predictButton.addEventListener("click", runPrediction);
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.add("is-dragging");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("is-dragging");
+      });
+    });
+
+    dropzone.addEventListener("drop", (event) => {
+      const file = event.dataTransfer.files[0];
+      if (file) {
+        setSelectedFile(file);
+      }
+    });
+  </script>
+</body>
+</html>
